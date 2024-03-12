@@ -1,0 +1,31 @@
+version: "3.9"
+
+volumes:
+  pgdata:
+
+services:
+  database:
+    image: postgres:latest
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=verySecretPassword
+      - POSTGRES_USER=administrator
+      - POSTGRES_DB=spamoverflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    restart: always
+    environment:
+      SQLALCHEMY_DATABASE_URI: postgresql://administrator:verySecretPassword@database:5432/spamoverflow
+    ports:
+      - 8080:8080
+    depends_on:
+      - database
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8000:8080

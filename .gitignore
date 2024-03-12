@@ -35,3 +35,7 @@ terraform.rc
 
 # Ignore the credentials file
 credentials
+
+# Ignore the data folder
+data/
+instance/
