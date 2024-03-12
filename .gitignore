@@ -39,3 +39,6 @@ credentials
 # Ignore the data folder
 data/
 instance/
+
+# ignore __pycache__ folder
+__pycache__/
