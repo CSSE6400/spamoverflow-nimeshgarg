@@ -7,8 +7,8 @@
 export DOCKER_BUILDKIT=1
 
 # Build the docker container.
-# docker build -t s4728539 .
-docker-compose up
+docker build -t s4728539 .
+# docker-compose up
 
 # Run the docker container in the background and remove after its closed.
-# docker run -d --rm -p 8080:8080 s4728539
+docker run -d --rm -p 8080:8080 s4728539
