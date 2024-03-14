@@ -20,11 +20,18 @@ validation_error = ""
 
 #first 4 characters should be integer
 def validate_uuid4(uuid_string):
-    try:
-        int(uuid_string[:4])
-        return True
-    except ValueError:
+
+    # check if the customer is present in db or not
+    data = EmailData.query.filter_by(customer_id=uuid_string)
+    if data is None:
         return False
+    return True
+
+    # try:
+    #     int(uuid_string[:4])
+    #     return True
+    # except ValueError:
+    #     return False
 
 
 def validate_request_body(data):
@@ -123,7 +130,7 @@ def post_email(customer_id):
         # Extract data from the request
         data = request.get_json()
 
-        # # Validate customer_id
+        # Validate customer_id
         # if not validate_uuid4(customer_id):
         #     return jsonify({"error": "Invalid customer_id","error":"Invalid Customer ID format"}), 400
 
@@ -155,7 +162,7 @@ def post_email(customer_id):
             os.makedirs("outputs")
         if not os.path.exists("inputs"):
             os.makedirs("inputs")
-
+            
         dictionary  = {
             'id': f"{email.id}",
             'content':email.body,
@@ -193,8 +200,8 @@ def get_email(customer_id, id):
         # Extract data from the request
         data = request.get_json()
         # Validate customer_id
-        # if not validate_uuid4(customer_id):
-        #     return jsonify({"error": "Invalid customer_id"}), 400
+        if not validate_uuid4(customer_id):
+            return jsonify({"error": "Invalid customer_id"}), 400
         
         email = EmailData.query.filter_by(customer_id=customer_id, id=id)
         print(str(email))
@@ -214,8 +221,8 @@ def get_email(customer_id, id):
 def get_malicious_senders(customer_id):
     try:
         # Validate customer_id
-        # if not validate_uuid4(customer_id):
-        #     return jsonify({"error": "Invalid customer_id"}), 400
+        if not validate_uuid4(customer_id):
+            return jsonify({"error": "Invalid customer_id"}), 400
 
         # Query the database for malicious senders
         malicious_senders = db.session.query(
@@ -244,8 +251,8 @@ def get_malicious_senders(customer_id):
 def get_malicious_domains(customer_id):
     try:
         # Validate customer_id
-        # if not validate_uuid4(customer_id):
-        #     return jsonify({"error": "Invalid customer_id"}), 400
+        if not validate_uuid4(customer_id):
+            return jsonify({"error": "Invalid customer_id"}), 400
 
         # Query the database for malicious domains
         malicious_domains = db.session.query(
@@ -274,8 +281,8 @@ def get_malicious_domains(customer_id):
 def get_recipients_of_malicious_emails(customer_id):
     try:
         # Validate customer_id
-        # if not validate_uuid4(customer_id):
-        #     return jsonify({"error": "Invalid customer_id"}), 400
+        if not validate_uuid4(customer_id):
+            return jsonify({"error": "Invalid customer_id"}), 400
 
         # Query the database for recipients of malicious emails
         malicious_recipients = db.session.query(
