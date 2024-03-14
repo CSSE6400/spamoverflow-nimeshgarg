@@ -27,7 +27,7 @@ class EmailData(db.Model):
 
     def to_dict(self):
         return {
-            "id": self.id,
+            "id": str(self.id),
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
             "contents": {
