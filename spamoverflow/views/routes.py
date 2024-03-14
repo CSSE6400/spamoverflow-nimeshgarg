@@ -151,6 +151,11 @@ def post_email(customer_id):
         db.session.add(email)
         db.session.commit()
 
+        if not os.path.exists("outputs"):
+            os.makedirs("outputs")
+        if not os.path.exists("inputs"):
+            os.makedirs("inputs")
+            
         dictionary  = {
             'id': f"{email.id}",
             'content':email.body,

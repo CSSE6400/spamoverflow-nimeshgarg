@@ -11,7 +11,5 @@ RUN poetry install --no-root
 COPY spamoverflow spamoverflow
 
 COPY spamhammer spamhammer
-COPY inputs inputs
-COPY outputs outputs
 
 CMD ["poetry", "run", "flask", "--app", "spamoverflow", "run", "--host", "0.0.0.0", "--port", "8080"]
