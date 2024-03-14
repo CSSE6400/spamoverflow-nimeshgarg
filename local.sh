@@ -3,6 +3,7 @@
 # Change to the app folder.
 cd app
 
+sudo apt-get install docker-compose-plugin -y
 # Buildkit to make sure we know what env
 export DOCKER_BUILDKIT=1
 
