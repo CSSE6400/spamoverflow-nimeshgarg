@@ -42,3 +42,5 @@ instance/
 
 # ignore __pycache__ folder
 __pycache__/
+
+examples/

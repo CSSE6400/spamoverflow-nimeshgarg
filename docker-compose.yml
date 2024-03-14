@@ -2,6 +2,7 @@ version: "3.9"
 
 volumes:
   pgdata:
+  appdata:
 
 services:
   database:
@@ -23,6 +24,10 @@ services:
       - 8080:8080
     depends_on:
       - database
+    volumes:
+      - appdata:/app/
+
+  
 
   adminer:
     image: adminer

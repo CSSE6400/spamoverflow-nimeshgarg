@@ -1,9 +1,13 @@
-from flask import Blueprint, jsonify, request, make_response
+import json
+import os
+import subprocess
+from flask import Blueprint, jsonify, request
 from spamoverflow.models.email_data import EmailData, Status
 from datetime import datetime
 import re
 from urllib.parse import urlparse
 from spamoverflow.models import db
+from sqlalchemy import func
 
 api = Blueprint('api', __name__, url_prefix='/api/v1')
 
@@ -13,6 +17,14 @@ api = Blueprint('api', __name__, url_prefix='/api/v1')
 health = 1
 
 validation_error = ""
+
+#first 4 characters should be integer
+def validate_uuid4(uuid_string):
+    try:
+        int(uuid_string[:4])
+        return True
+    except ValueError:
+        return False
 
 
 def validate_request_body(data):
@@ -61,8 +73,8 @@ def health():
 @api.route('/customers/<string:uuidV4>/emails', methods=['GET'])
 def get_emails(uuidV4):
     try:
-        limit = request.args.get('limit', type=int)
-        offset = request.args.get('offset', type=int)
+        limit = request.args.get('limit', type=int, default=100)
+        offset = request.args.get('offset', type=int, default=0)
         start = request.args.get('start', type=str)
         end = request.args.get('end', type=str)
         from_email = request.args.get('from', type=str)
@@ -97,10 +109,10 @@ def get_emails(uuidV4):
         return jsonify([email.to_dict() for email in emails]), 200
 
     except ValueError as e:
-        return make_response(jsonify({"error": str(e)}), 400)
+        return jsonify({"error": str(e)}), 400
 
     except Exception as e:
-        return make_response(jsonify({"error": "An unknown error occurred."}), 500)
+        return jsonify({"error": "An unknown error occurred.","specific":str(e)}), 500
     
 @api.route('/customers/<string:customer_id>/emails', methods=['POST'])
 def post_email(customer_id):
@@ -108,13 +120,13 @@ def post_email(customer_id):
         # Extract data from the request
         data = request.get_json()
 
-        # # Validate customer_id
-        # if not validate_uuid4(customer_id):
-        #     return make_response(jsonify({"error": "Invalid customer_id"}), 400)
+        # Validate customer_id
+        if not validate_uuid4(customer_id):
+            return jsonify({"error": "Invalid customer_id","error":"Invalid Customer ID format"}), 400
 
         # Validate request body
         if not validate_request_body(data):
-            return make_response(jsonify({"error": "Invalid request body","error":validation_error}), 400)
+            return jsonify({"error": "Invalid request body","error":validation_error}), 400
 
         # Create a new EmailData object
         email = EmailData(
@@ -127,6 +139,7 @@ def post_email(customer_id):
             body=data['contents']['body'],
             state=Status.pending,
             # malicious=False,
+            priority=customer_id[:4],
             domains=extract_domains(data['contents']['body']),
             spamhammer_metadata=data['metadata']['spamhammer']
         )
@@ -135,8 +148,146 @@ def post_email(customer_id):
         db.session.add(email)
         db.session.commit()
 
+        dictionary  = {
+            'id': f"{email.id}",
+            'content':email.body,
+            'metadata':email.spamhammer_metadata
+        }
+        print(str(dictionary))
+        
+        json_object = json.dumps(dictionary, indent=4) 
+
+        with open(f"inputs/{email.id}.json", "w") as outfile:
+            outfile.write(json_object)
+        
+        # subprocess.run(["pwd"])
+        # subprocess.run([f"./spamhammer scan --input inputs/{email.id}.json --output outputs/{email.id}"])
+            
+        os.system(f"./spamhammer scan --input inputs/{email.id}.json --output outputs/{email.id}")
+
+        if os.path.exists(f"outputs/{email.id}.json"):
+            with open(f"outputs/{email.id}.json") as f:
+                data = json.load(f)
+                email.malicious = data['malicious']
+                email.state = Status.scanned
+                email.updated_at = datetime.now()
+                db.session.commit()
+
         return jsonify(email.to_dict()), 201
 
     except Exception as e:
-        print(e)
-        return make_response(jsonify({"error": "An unknown error occurred.","error":e}), 500)
+        return jsonify({"error": "An unknown error occurred.","specific":str(e)}), 500
+    
+
+@api.route('/customers/<string:customer_id>/emails/<int:id>', methods=['GET'])
+def get_email(customer_id, id):
+    try:
+        # Extract data from the request
+        data = request.get_json()
+        # Validate customer_id
+        if not validate_uuid4(customer_id):
+            return jsonify({"error": "Invalid customer_id"}), 400
+        
+        email = EmailData.query.filter_by(customer_id=customer_id, id=id)
+        print(str(email))
+        if email:
+            return jsonify(email.to_dict()), 200
+        else:
+            email = EmailData.query.filter_by(customer_id=customer_id)
+            if email:
+                return jsonify({"error": "ID not found"}), 404
+            else:
+                return jsonify({"error": "Customer not found"}), 404
+
+    except Exception as e:
+         return jsonify({"error": "An unknown error occurred.","specific":str(e)}), 500
+
+@api.route('/customers/<string:customer_id>/reports/actors', methods=['GET'])
+def get_malicious_senders(customer_id):
+    try:
+        # Validate customer_id
+        if not validate_uuid4(customer_id):
+            return jsonify({"error": "Invalid customer_id"}), 400
+
+        # Query the database for malicious senders
+        malicious_senders = db.session.query(
+            EmailData.from_email.label('id'),
+            func.count(EmailData.id).label('count')
+        ).filter(
+            EmailData.customer_id == customer_id,
+            EmailData.malicious == True
+        ).group_by(
+            EmailData.from_email
+        ).all()
+
+        # Prepare the response
+        response = {
+            "generated_at": datetime.now().isoformat(),
+            "total": len(malicious_senders),
+            "data": [sender._asdict() for sender in malicious_senders]
+        }
+
+        return jsonify(response), 200
+
+    except Exception as e:
+        return jsonify({"error": "An unknown error occurred.", "specific": str(e)}), 500
+
+@api.route('/customers/<string:customer_id>/reports/domains', methods=['GET'])
+def get_malicious_domains(customer_id):
+    try:
+        # Validate customer_id
+        if not validate_uuid4(customer_id):
+            return jsonify({"error": "Invalid customer_id"}), 400
+
+        # Query the database for malicious domains
+        malicious_domains = db.session.query(
+            EmailData.domains.label('id'),
+            func.count(EmailData.id).label('count')
+        ).filter(
+            EmailData.customer_id == customer_id,
+            EmailData.malicious == True
+        ).group_by(
+            EmailData.domains
+        ).all()
+
+        # Prepare the response
+        response = {
+            "generated_at": datetime.now().isoformat(),
+            "total": len(malicious_domains),
+            "data": [domain._asdict() for domain in malicious_domains]
+        }
+
+        return jsonify(response), 200
+
+    except Exception as e:
+        return jsonify({"error": "An unknown error occurred.", "specific": str(e)}), 500
+
+@api.route('/customers/<string:customer_id>/reports/recipients', methods=['GET'])
+def get_recipients_of_malicious_emails(customer_id):
+    try:
+        # Validate customer_id
+        if not validate_uuid4(customer_id):
+            return jsonify({"error": "Invalid customer_id"}), 400
+
+        # Query the database for recipients of malicious emails
+        malicious_recipients = db.session.query(
+            EmailData.to_email.label('id'),
+            func.count(EmailData.id).label('count')
+        ).filter(
+            EmailData.customer_id == customer_id,
+            EmailData.malicious == True
+        ).group_by(
+            EmailData.to_email
+        ).all()
+
+        # Prepare the response
+        response = {
+            "generated_at": datetime.now().isoformat(),
+            "total": len(malicious_recipients),
+            "data": [recipient._asdict() for recipient in malicious_recipients]
+        }
+
+        return jsonify(response), 200
+
+    except Exception as e:
+        return jsonify({"error": "An unknown error occurred.", "specific": str(e)}), 500
