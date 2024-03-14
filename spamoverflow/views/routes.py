@@ -56,6 +56,9 @@ def extract_domains(body):
     # Extract domains from the URLs
     domains = [urlparse(url).netloc for url in urls]
 
+    # remove dulicates
+    domains = list(set(domains))
+
     # Join the domains into a string with commas
     domains_string = ",".join(domains)
 
