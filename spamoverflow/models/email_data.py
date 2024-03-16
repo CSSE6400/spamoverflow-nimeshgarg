@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime,timezone
 from enum import Enum
 from . import db
 
@@ -14,8 +14,8 @@ class EmailData(db.Model):
     customer_id = db.Column(db.String(255), nullable=False)
     #first 4 characters of the customer id make the priority
     priority = db.Column(db.String(4), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
     body = db.Column(db.Text, nullable=False)
     subject = db.Column(db.String(255), nullable=False)
     from_email = db.Column(db.String(255), nullable=False)
@@ -28,8 +28,8 @@ class EmailData(db.Model):
     def to_dict(self):
         return {
             "id": str(self.id),
-            "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat(),
+            "created_at": self.created_at.isoformat()+"Z",
+            "updated_at": self.updated_at.isoformat()+"Z",
             "contents": {
                 "from": self.from_email,
                 "to": self.to_email,

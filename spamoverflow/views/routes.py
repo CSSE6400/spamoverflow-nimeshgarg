@@ -3,7 +3,7 @@ import os
 import subprocess
 from flask import Blueprint, jsonify, request
 from spamoverflow.models.email_data import EmailData, Status
-from datetime import datetime
+from datetime import datetime,timezone
 import re
 from urllib.parse import urlparse
 from spamoverflow.models import db
@@ -18,12 +18,16 @@ health = 1
 
 validation_error = ""
 
-#first 4 characters should be integer
-def validate_uuid4(uuid_string):
+def current_time_reports():
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-    # check if the customer is present in db or not
-    data = EmailData.query.filter_by(customer_id=uuid_string)
-    if data is None:
+def current_time():
+    return datetime.now(timezone.utc)
+
+#first 4 characters should be integer
+def validate_customer(uuid_string):
+    query = EmailData.query.filter_by(customer_id=uuid_string)
+    if query.all() in [[]]:
         return False
     return True
 
@@ -79,6 +83,13 @@ def health():
         return jsonify({"status":"Backlog"}),503
     else:
         return jsonify({"status":"Healthy"}),200
+    
+def email_format(email):
+    #check if email is of the format user@domain
+    break_email = email.split('@')
+    if len(break_email) >= 2:
+        return True
+    return False
 
 @api.route('/customers/<string:uuidV4>/emails', methods=['GET'])
 def get_emails(uuidV4):
@@ -90,29 +101,49 @@ def get_emails(uuidV4):
         from_email = request.args.get('from', type=str)
         to_email = request.args.get('to', type=str)
         state = request.args.get('state', default=None, type=str)
-        only_malicious = request.args.get('only_malicious', default=False, type=bool)
+        only_malicious = request.args.get('only_malicious', type=str)
 
         query = EmailData.query.filter_by(customer_id=uuidV4)
 
+        if validate_customer(uuidV4) == False:
+           raise ValueError("Invalid customer_id")
+        
+        print(query.all())
+
         if start:
             start = datetime.fromisoformat(start)
-            query = query.filter(EmailData.submitted_date >= start)
+            query = query.filter(EmailData.created_at >= start)
 
         if end:
             end = datetime.fromisoformat(end)
-            query = query.filter(EmailData.submitted_date <= end)
+            query = query.filter(EmailData.created_at <= end)
+
 
         if from_email:
+            if not email_format(from_email):
+                raise ValueError("Invalid from email format")
             query = query.filter(EmailData.from_email == from_email)
 
         if to_email:
+            if not email_format(to_email):
+                raise ValueError("Invalid to email format")
             query = query.filter(EmailData.to_email == to_email)
 
         if state:
+            if state not in [Status.pending.value, Status.scanned.value, Status.failed.value]:
+                raise ValueError("Invalid state")
             query = query.filter(EmailData.state == state)
 
-        if only_malicious:
+        if only_malicious not in ["true","false", None]:
+            raise ValueError("Invalid only_malicious")
+        if only_malicious == "true":
             query = query.filter(EmailData.malicious == True)
+        
+        if offset < 0:
+            raise ValueError("Invalid offset")
+        
+        if limit <= 0 or limit > 1000:
+            raise ValueError("Invalid limit")
 
         emails = query.limit(limit).offset(offset).all()
 
@@ -141,8 +172,8 @@ def post_email(customer_id):
         # Create a new EmailData object
         email = EmailData(
             customer_id=customer_id,
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
+            created_at=current_time(),
+            updated_at=current_time(),
             from_email=data['contents']['from'],
             to_email=data['contents']['to'],
             subject=data['contents']['subject'],
@@ -185,25 +216,25 @@ def post_email(customer_id):
                 data = json.load(f)
                 email.malicious = data['malicious']
                 email.state = Status.scanned
-                email.updated_at = datetime.now()
+                email.updated_at = current_time(),
                 db.session.commit()
 
         return jsonify(email.to_dict()), 201
 
     except Exception as e:
+        print("email post error")
+        print(str(e))
         return jsonify({"error": "An unknown error occurred.","specific":str(e)}), 500
     
 
 @api.route('/customers/<string:customer_id>/emails/<int:id>', methods=['GET'])
 def get_email(customer_id, id):
     try:
-        # Extract data from the request
-        data = request.get_json()
         # Validate customer_id
-        if not validate_uuid4(customer_id):
+        if not validate_customer(customer_id):
             return jsonify({"error": "Invalid customer_id"}), 400
         
-        email = EmailData.query.filter_by(customer_id=customer_id, id=id)
+        email = EmailData.query.filter_by(customer_id=customer_id, id=id).first()
         print(str(email))
         if email:
             return jsonify(email.to_dict()), 200
@@ -215,14 +246,21 @@ def get_email(customer_id, id):
                 return jsonify({"error": "Customer not found"}), 404
 
     except Exception as e:
-         return jsonify({"error": "An unknown error occurred.","specific":str(e)}), 500
+        print("email get error")
+        print(str(e))
+        return jsonify({"error": "An unknown error occurred.","specific":str(e)}), 500
 
 @api.route('/customers/<string:customer_id>/reports/actors', methods=['GET'])
 def get_malicious_senders(customer_id):
     try:
         # Validate customer_id
-        if not validate_uuid4(customer_id):
-            return jsonify({"error": "Invalid customer_id"}), 400
+        if not validate_customer(customer_id):
+            response = {
+                "generated_at": current_time_reports(),
+                "total": 0,
+                "data": []
+            }
+            return jsonify(response), 200
 
         # Query the database for malicious senders
         malicious_senders = db.session.query(
@@ -237,7 +275,7 @@ def get_malicious_senders(customer_id):
 
         # Prepare the response
         response = {
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": current_time_reports(),
             "total": len(malicious_senders),
             "data": [sender._asdict() for sender in malicious_senders]
         }
@@ -251,8 +289,13 @@ def get_malicious_senders(customer_id):
 def get_malicious_domains(customer_id):
     try:
         # Validate customer_id
-        if not validate_uuid4(customer_id):
-            return jsonify({"error": "Invalid customer_id"}), 400
+        if not validate_customer(customer_id):
+            response = {
+                "generated_at": current_time_reports(),
+                "total": 0,
+                "data": []
+            }
+            return jsonify(response), 200
 
         # Query the database for malicious domains
         malicious_domains = db.session.query(
@@ -267,7 +310,7 @@ def get_malicious_domains(customer_id):
 
         # Prepare the response
         response = {
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": current_time_reports(),
             "total": len(malicious_domains),
             "data": [domain._asdict() for domain in malicious_domains]
         }
@@ -281,8 +324,13 @@ def get_malicious_domains(customer_id):
 def get_recipients_of_malicious_emails(customer_id):
     try:
         # Validate customer_id
-        if not validate_uuid4(customer_id):
-            return jsonify({"error": "Invalid customer_id"}), 400
+        if not validate_customer(customer_id):
+            response = {
+                "generated_at": current_time_reports(),
+                "total": 0,
+                "data": []
+            }
+            return jsonify(response), 200
 
         # Query the database for recipients of malicious emails
         malicious_recipients = db.session.query(
@@ -297,7 +345,7 @@ def get_recipients_of_malicious_emails(customer_id):
 
         # Prepare the response
         response = {
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": current_time_reports(),
             "total": len(malicious_recipients),
             "data": [recipient._asdict() for recipient in malicious_recipients]
         }
