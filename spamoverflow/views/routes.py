@@ -5,7 +5,6 @@ from flask import Blueprint, jsonify, request
 from spamoverflow.models.email_data import EmailData, Status
 from datetime import datetime,timezone
 import re
-import sleep
 from urllib.parse import urlparse
 from spamoverflow.models import db
 from sqlalchemy import func
@@ -211,7 +210,6 @@ def post_email(customer_id):
         # subprocess.run([f"./spamhammer scan --input inputs/{email.id}.json --output outputs/{email.id}"])
             
         os.system(f"./spamhammer scan --input inputs/{email.id}.json --output outputs/{email.id}")
-        sleep(.1)
 
         if os.path.exists(f"outputs/{email.id}.json"):
             with open(f"outputs/{email.id}.json") as f:
