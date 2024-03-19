@@ -207,17 +207,24 @@ def post_email(customer_id):
             outfile.write(json_object)
         
         # subprocess.run(["pwd"])
-        # subprocess.run([f"./spamhammer scan --input inputs/{email.id}.json --output outputs/{email.id}"])
+        subprocess.run(f"./spamhammer scan --input inputs/{email.id}.json --output outputs/{email.id}", shell=True)
             
-        os.system(f"./spamhammer scan --input inputs/{email.id}.json --output outputs/{email.id}")
+        # os.system(f"./spamhammer scan --input inputs/{email.id}.json --output outputs/{email.id}")
 
-        if os.path.exists(f"outputs/{email.id}.json"):
-            with open(f"outputs/{email.id}.json") as f:
+        with open(f"outputs/{email.id}.json") as f:
                 data = json.load(f)
                 email.malicious = data['malicious']
                 email.state = Status.scanned
                 # email.updated_at = current_time(),
                 db.session.commit()
+
+        # if os.path.exists(f"outputs/{email.id}.json"):
+        #     with open(f"outputs/{email.id}.json") as f:
+        #         data = json.load(f)
+        #         email.malicious = data['malicious']
+        #         email.state = Status.scanned
+        #         # email.updated_at = current_time(),
+        #         db.session.commit()
 
         return jsonify(email.to_dict()), 201
 
