@@ -216,7 +216,7 @@ def post_email(customer_id):
                 data = json.load(f)
                 email.malicious = data['malicious']
                 email.state = Status.scanned
-                email.updated_at = current_time(),
+                # email.updated_at = current_time(),
                 db.session.commit()
 
         return jsonify(email.to_dict()), 201

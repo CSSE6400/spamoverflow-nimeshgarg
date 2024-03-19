@@ -14,8 +14,8 @@ class EmailData(db.Model):
     customer_id = db.Column(db.String(255), nullable=False)
     #first 4 characters of the customer id make the priority
     priority = db.Column(db.String(4), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now(), nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now(), onupdate = datetime.now(timezone.utc), nullable=False)
     body = db.Column(db.Text, nullable=False)
     subject = db.Column(db.String(255), nullable=False)
     from_email = db.Column(db.String(255), nullable=False)
