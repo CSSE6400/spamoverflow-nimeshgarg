@@ -1,0 +1,19 @@
+name: Check for tags
+on: push
+
+jobs:
+  check-tag:
+    runs-on: stable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Check for Tag
+        run: |
+          if [ $(git tag -l "stage-1") ]; then
+            echo "Stage 1 is already tagged"
+          else
+            echo "Stage 1 is not tagged"
+            exit 1
+          fi
