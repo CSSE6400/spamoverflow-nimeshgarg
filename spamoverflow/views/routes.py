@@ -108,7 +108,7 @@ def get_emails(uuidV4):
         if validate_customer(uuidV4) == False:
            raise ValueError("Invalid customer_id")
         
-        print(query.all())
+        # print(query.all())
 
         if start:
             start = datetime.fromisoformat(start)
@@ -199,7 +199,7 @@ def post_email(customer_id):
             'content':email.body,
             'metadata':email.spamhammer_metadata
         }
-        print(str(dictionary))
+        # print(str(dictionary))
         
         json_object = json.dumps(dictionary, indent=4) 
 
@@ -229,8 +229,8 @@ def post_email(customer_id):
         return jsonify(email.to_dict()), 201
 
     except Exception as e:
-        print("email post error")
-        print(str(e))
+        # print("email post error")
+        # print(str(e))
         return jsonify({"error": "An unknown error occurred.","specific":str(e)}), 500
     
 
@@ -242,7 +242,7 @@ def get_email(customer_id, id):
             return jsonify({"error": "Invalid customer_id"}), 400
         
         email = EmailData.query.filter_by(customer_id=customer_id, id=id).first()
-        print(str(email))
+        # print(str(email))
         if email:
             return jsonify(email.to_dict()), 200
         else:
@@ -253,8 +253,8 @@ def get_email(customer_id, id):
                 return jsonify({"error": "Customer not found"}), 404
 
     except Exception as e:
-        print("email get error")
-        print(str(e))
+        # print("email get error")
+        # print(str(e))
         return jsonify({"error": "An unknown error occurred.","specific":str(e)}), 500
 
 @api.route('/customers/<string:customer_id>/reports/actors', methods=['GET'])
