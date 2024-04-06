@@ -37,7 +37,7 @@ provider "aws" {
 }
 
 resource "local_file" "url" {
-  content    = aws_lb.spamoverflow.dns_name # replace this with a URL from your terraform
+  content    = "${aws_lb.spamoverflow.dns_name}:8080/" # replace this with a URL from your terraform
   filename   = "./api.txt"
   depends_on = [aws_lb.spamoverflow]
 }
