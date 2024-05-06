@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Change to the app folder.
-# cd app
+# cd services/endpoints
 
 # Buildkit to make sure we know what env
 export DOCKER_BUILDKIT=1

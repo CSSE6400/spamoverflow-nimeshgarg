@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import requests
 from flask import Blueprint, jsonify, request
 from spamoverflow.models.email_data import EmailData, Status
 from datetime import datetime,timezone
@@ -202,6 +203,8 @@ def post_email(customer_id):
         # print(str(dictionary))
         
         json_object = json.dumps(dictionary, indent=4) 
+        # requests.post("http://localhost:8080/api/v1/spamhammer",timeout=0.0000000000000001,json=dictionary)
+        # print("Post COmpleted")
 
         with open(f"inputs/{email.id}.json", "w") as outfile:
             outfile.write(json_object)
@@ -227,11 +230,34 @@ def post_email(customer_id):
         #         db.session.commit()
 
         return jsonify(email.to_dict()), 201
+    
+    # except requests.exceptions.ReadTimeout:
+    #     return jsonify(email.to_dict()), 201
 
     except Exception as e:
-        # print("email post error")
-        # print(str(e))
-        return jsonify({"error": "An unknown error occurred.","specific":str(e)}), 500
+            # print("email post error")
+            # print(str(e))
+            return jsonify({"error": "An unknown error occurred.","specific":str(e)}), 500
+
+@api.route('/spamhammer', methods=['POST'])
+def spamhammer():
+    # print("spamhammer starting......")
+    data = request.get_json()
+    # print(data)
+    email = EmailData.query.filter_by(id = data['id']).first()
+    data = json.dumps(data).encode('utf-8')  # Convert the dictionary to a JSON string
+    test_run = subprocess.run("./spamhammer scan --input '-' --output '-'", shell=True,stdout=subprocess.PIPE,input=data)
+    data_result = json.loads(test_run.stdout)
+    print(data_result)
+    if data_result['malicious'] == "True":
+        email.malicious = True
+    else :
+        email.malicious = False
+    email.state = Status.scanned
+    email.updated_at = datetime.now(timezone.utc)
+    # print(email.to_dict())
+    db.session.commit()
+    return jsonify({"status":"ok"}), 200
     
 
 @api.route('/customers/<string:customer_id>/emails/<int:id>', methods=['GET'])

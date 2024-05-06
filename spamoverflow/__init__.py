@@ -6,6 +6,7 @@ def create_app(config_overrides=None):
    app = Flask(__name__) 
  
    app.config['SQLALCHEMY_DATABASE_URI'] = environ.get("SQLALCHEMY_DATABASE_URI", "sqlite:///db.sqlite")
+   app.config['SQS_URL'] = environ.get("SQS_URL", "http://localhost:8080/api/v1/spamhammer/")
    if config_overrides: 
        app.config.update(config_overrides)
  
